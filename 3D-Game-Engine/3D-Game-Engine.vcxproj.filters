@@ -4,10 +4,12 @@
     <ClCompile Include="src\cpp\Main.cpp" />
     <ClCompile Include="src\cpp\DependencyInit.cpp" />
     <ClCompile Include="src\cpp\ShaderManager.cpp" />
+    <ClCompile Include="src\cpp\VertexBufferObject.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\headers\DependencyInit.h" />
     <ClInclude Include="src\headers\ShaderManager.h" />
+    <ClInclude Include="src\headers\VertexBufferObject.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="src\shaders\VertexShader.shader" />
