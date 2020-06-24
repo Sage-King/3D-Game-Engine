@@ -1,55 +1,79 @@
+#include <Windows.h>
+
 #include "glew.h"
 #include "glfw3.h"
 
-#include <chrono>
+#include "DependencyInit.h"
+#include "ShaderManager.h"
+
 #include <iostream>
+
+//TODO: Vertex Buffers & Related Arrays
 
 int main(void)
 {
     GLFWwindow* window;
-
-    if (!glfwInit())
-        return -1;
-
-    window = glfwCreateWindow(640, 480, "Hello World", NULL, NULL);
-    if (!window)
+    try
     {
-        glfwTerminate();
+        window = initDependencies();
+    }
+    catch (const std::runtime_error& e)
+    {
+        std::cout << e.what() << std::endl;
+        __debugbreak();
         return -1;
     }
 
-    glfwMakeContextCurrent(window);
 
-    double oscRed = 0.0;
-    double oscAmountPerSecond = 1;
+    #ifdef _DEBUG
+        enableOpenGLDebug();
+    #endif // DEBUG
+    
+    std::vector<GLuint> shaderHandles;
 
-    std::chrono::steady_clock::time_point oldFrameTime = std::chrono::steady_clock::now();
+    try
+    {
+        shaderHandles.push_back(ShaderManager::compileShader(GL_VERTEX_SHADER, "D:\\Repos\\3D-Game-Engine\\3D-Game-Engine\\src\\shaders\\VertexShader.shader"));
+    }
+    catch (std::runtime_error e)
+    {
+        std::cout << e.what() << std::endl;
+        __debugbreak();
+        return -1;
+    }
 
-     while (!glfwWindowShouldClose(window))
-     {
-        //update
-        //oscillate Red Color
-        if (oscRed > 1.0)
-        {
-            oscRed = 1.0;
-            oscAmountPerSecond *= -1;
-        }
-        else if (oscRed < 0.0)
-        {
-            oscRed = 0.0;
-            oscAmountPerSecond *= -1;
-        }
-        //end oscillate Red Color
-        std::chrono::duration<double> deltaTime = std::chrono::steady_clock::now() - oldFrameTime;
-        oscRed += oscAmountPerSecond * deltaTime.count();
-        oldFrameTime = std::chrono::steady_clock::now();
+    try
+    {
+        shaderHandles.push_back(ShaderManager::compileShader(GL_FRAGMENT_SHADER, "D:\\Repos\\3D-Game-Engine\\3D-Game-Engine\\src\\shaders\\FragmentShader.shader"));
+    }
+    catch (std::runtime_error e)
+    {
+        std::cout << e.what() << std::endl;
+        __debugbreak();
+        return -1;
+    }
+    
+    GLuint programHandle;
 
-        //debug print
-        std::cout << oscRed << std::endl;
+    try
+    {
+        programHandle = ShaderManager::linkProgram(shaderHandles);
+    }
+    catch(std::runtime_error e)
+    {
+        std::cout << e.what() << std::endl;
+        __debugbreak();
+        return -1;
+    }
 
-        //render
-        glClearColor(oscRed, 1.0f, 1.0f, 1.0f);
+    while (!glfwWindowShouldClose(window))
+    {
+        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
+
+        glUseProgram(programHandle);
+        glUseProgram(0);
+
         glfwSwapBuffers(window);
         glfwPollEvents();
     }

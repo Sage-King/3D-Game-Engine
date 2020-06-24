@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -186,7 +186,17 @@
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="src\cpp\DependencyInit.cpp" />
     <ClCompile Include="src\cpp\Main.cpp" />
+    <ClCompile Include="src\cpp\ShaderManager.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\headers\DependencyInit.h" />
+    <ClInclude Include="src\headers\ShaderManager.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\shaders\FragmentShader.shader" />
+    <None Include="src\shaders\VertexShader.shader" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

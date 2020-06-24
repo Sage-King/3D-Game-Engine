@@ -2,5 +2,15 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="src\cpp\Main.cpp" />
+    <ClCompile Include="src\cpp\DependencyInit.cpp" />
+    <ClCompile Include="src\cpp\ShaderManager.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\headers\DependencyInit.h" />
+    <ClInclude Include="src\headers\ShaderManager.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="src\shaders\VertexShader.shader" />
+    <None Include="src\shaders\FragmentShader.shader" />
   </ItemGroup>
 </Project>
