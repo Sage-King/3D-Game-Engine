@@ -2,17 +2,34 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="src\cpp\Main.cpp" />
-    <ClCompile Include="src\cpp\DependencyInit.cpp" />
-    <ClCompile Include="src\cpp\ShaderManager.cpp" />
-    <ClCompile Include="src\cpp\VertexBufferObject.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\headers\DependencyInit.h" />
-    <ClInclude Include="src\headers\ShaderManager.h" />
-    <ClInclude Include="src\headers\VertexBufferObject.h" />
+    <ClInclude Include="Dependencies\glm-0.9.9.8\glm\glm\common.hpp" />
+    <ClInclude Include="Dependencies\glm-0.9.9.8\glm\glm\exponential.hpp" />
+    <ClInclude Include="Dependencies\glm-0.9.9.8\glm\glm\ext.hpp" />
+    <ClInclude Include="Dependencies\glm-0.9.9.8\glm\glm\fwd.hpp" />
+    <ClInclude Include="Dependencies\glm-0.9.9.8\glm\glm\geometric.hpp" />
+    <ClInclude Include="Dependencies\glm-0.9.9.8\glm\glm\glm.hpp" />
+    <ClInclude Include="Dependencies\glm-0.9.9.8\glm\glm\integer.hpp" />
+    <ClInclude Include="Dependencies\glm-0.9.9.8\glm\glm\mat2x2.hpp" />
+    <ClInclude Include="Dependencies\glm-0.9.9.8\glm\glm\mat2x3.hpp" />
+    <ClInclude Include="Dependencies\glm-0.9.9.8\glm\glm\mat2x4.hpp" />
+    <ClInclude Include="Dependencies\glm-0.9.9.8\glm\glm\mat3x2.hpp" />
+    <ClInclude Include="Dependencies\glm-0.9.9.8\glm\glm\mat3x3.hpp" />
+    <ClInclude Include="Dependencies\glm-0.9.9.8\glm\glm\mat3x4.hpp" />
+    <ClInclude Include="Dependencies\glm-0.9.9.8\glm\glm\mat4x2.hpp" />
+    <ClInclude Include="Dependencies\glm-0.9.9.8\glm\glm\mat4x3.hpp" />
+    <ClInclude Include="Dependencies\glm-0.9.9.8\glm\glm\mat4x4.hpp" />
+    <ClInclude Include="Dependencies\glm-0.9.9.8\glm\glm\matrix.hpp" />
+    <ClInclude Include="Dependencies\glm-0.9.9.8\glm\glm\packing.hpp" />
+    <ClInclude Include="Dependencies\glm-0.9.9.8\glm\glm\trigonometric.hpp" />
+    <ClInclude Include="Dependencies\glm-0.9.9.8\glm\glm\vec2.hpp" />
+    <ClInclude Include="Dependencies\glm-0.9.9.8\glm\glm\vec3.hpp" />
+    <ClInclude Include="Dependencies\glm-0.9.9.8\glm\glm\vec4.hpp" />
+    <ClInclude Include="Dependencies\glm-0.9.9.8\glm\glm\vector_relational.hpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="src\shaders\VertexShader.shader" />
-    <None Include="src\shaders\FragmentShader.shader" />
+    <None Include="src\shaders\VertexShader.vert" />
+    <None Include="src\shaders\FragmentShader.frag" />
   </ItemGroup>
 </Project>
