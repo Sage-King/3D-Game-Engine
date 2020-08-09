@@ -8,6 +8,8 @@
 #include "gtc/type_ptr.hpp"
 #include "gtc/matrix_access.hpp"
 
+#include "OpenGLUtilities.h"
+
 #include <iostream>
 #include <chrono>
 #include <vector>
@@ -15,6 +17,8 @@
 #include <fstream>
 #include <stack>
 #include <deque>
+
+
 
 #define PI 3.14159f
 
@@ -25,114 +29,7 @@ GLFWwindow* window;
 
 float incrementalAngleX = 0.0f, incrementalAngleY = 0.0f, incrementalAngleZ = 0.0f;
 
-glm::mat3 RotateX(float angleInDegree)
-{
-    glm::mat3 retMatrix(1.0f);
-
-    float AngleInRad = (angleInDegree * PI) / 180;
-    float Cos = cosf(AngleInRad);
-    float Sin = sinf(AngleInRad);
-
-    retMatrix[1].y = Cos;
-    retMatrix[2].y = -Sin;
-    retMatrix[1].z = Sin;
-    retMatrix[2].z = Cos;
-
-    return retMatrix;
-}
-
-glm::mat3 RotateY(float angleInDegree)
-{
-    glm::mat3 retMatrix(1.0f);
-
-    float AngleInRad = (angleInDegree * PI) / 180;
-    float Cos = cosf(AngleInRad);
-    float Sin = sinf(AngleInRad);
-
-    retMatrix[0].x = Cos;
-    retMatrix[2].x = Sin;
-    retMatrix[0].z = -Sin;
-    retMatrix[2].z = Cos;
-
-    return retMatrix;
-}
-
-glm::mat3 RotateZ(float angleInDegree)
-{
-    glm::mat3 retMatrix(1.0f);
-
-    float AngleInRad = (angleInDegree * PI) / 180;
-    float Cos = cosf(AngleInRad);
-    float Sin = sinf(AngleInRad);
-
-    retMatrix[0].x = Cos;
-    retMatrix[1].x = -Sin;
-    retMatrix[0].y = Sin;
-    retMatrix[1].y = Cos;
-
-    return retMatrix;
-}
-
-struct MatrixStack {
-public:
-    MatrixStack()
-    {
-        Push(glm::mat4(1.0f));
-    }
-
-    void Push(glm::mat4 pushMatrix)
-    {
-        matrixStack.push(pushMatrix);
-    }
-    void PushTop()
-    {
-        matrixStack.push(Top());
-    }
-    glm::mat4& Top() 
-    {
-        return matrixStack.top();
-    }
-    void translate(glm::vec3 inputVec)
-    {
-        glm::mat4 translateMatrix(1.0f);
-
-        translateMatrix[3] = glm::vec4(inputVec, 1.0f);
-
-        matrixStack.top() = matrixStack.top() * translateMatrix;
-    }
-    void scale(glm::vec3 scaleVec)
-    {
-        glm::mat4 scaleMatrix(1.0f);
-        scaleMatrix[0].x = scaleVec.x;
-        scaleMatrix[1].y = scaleVec.y;
-        scaleMatrix[2].z = scaleVec.z;
-
-        matrixStack.top() = matrixStack.top() * scaleMatrix;
-    }
-    void rotateX(float angleInDegrees)
-    {
-        matrixStack.top() = matrixStack.top() * glm::mat4(RotateX(angleInDegrees));
-    }
-    void rotateY(float angleInDegrees)
-    {
-        matrixStack.top() = matrixStack.top() * glm::mat4(RotateY(angleInDegrees));
-    }
-    void rotateZ(float angleInDegrees)
-    {
-        matrixStack.top() = matrixStack.top() * glm::mat4(RotateZ(angleInDegrees));
-    }
-    void Pop()
-    {
-        if (!matrixStack.empty()) 
-            matrixStack.pop();
-    }
-private:
-    std::stack<glm::mat4> matrixStack;
-};
-
 MatrixStack matrixStack;
-
-
 
 std::chrono::time_point<std::chrono::steady_clock> startOfProgram;
 
@@ -368,12 +265,12 @@ public:
     void IncrementForeArmAngle()
     {
         foreArmAngle += 5.0f;
-        Clamp(foreArmAngle, 80, 140);
+        Clamp(foreArmAngle, 50, 130);
     }
     void DecrementForeArmAngle()
     {
         foreArmAngle -= 5.0f;
-        Clamp(foreArmAngle, 80, 140);
+        Clamp(foreArmAngle, 50, 130);
     }
     void IncrementFingerAngle()
     {

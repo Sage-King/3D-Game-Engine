@@ -99,14 +99,14 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>GLEW_STATIC;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)$(ProjectName)\src\headers;$(SolutionDir)3D-Game-Engine\Dependencies\glfw\include;$(SolutionDir)3D-Game-Engine\Dependencies\glew\include;$(SolutionDir)3D-Game-Engine\Dependencies\glm</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)$(ProjectName)\src\headers;$(SolutionDir)3D-Game-Engine\Dependencies\glfw\include;$(SolutionDir)3D-Game-Engine\Dependencies\glew\include;$(SolutionDir)3D-Game-Engine\Dependencies\glm;$(SolutionDir)3D-Game-Engine\Dependencies\OpenGLUtilities\include</AdditionalIncludeDirectories>
       <UndefinePreprocessorDefinitions>GLEW_BUILD;</UndefinePreprocessorDefinitions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>glew32s.lib;glfw3.lib;opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(SolutionDir)3D-Game-Engine\Dependencies\glfw\lib;$(SolutionDir)3D-Game-Engine\Dependencies\glew\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>OpenGLUtilities.lib;glew32s.lib;glfw3.lib;opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(SolutionDir)3D-Game-Engine\Dependencies\glfw\lib;$(SolutionDir)3D-Game-Engine\Dependencies\glew\lib;$(SolutionDir)3D-Game-Engine\Dependencies\OpenGLUtilities\lib</AdditionalLibraryDirectories>
       <ShowProgress>NotSet</ShowProgress>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
       <AdditionalOptions>/NODEFAULTLIB:libcmt.lib /NODEFAULTLIB:msvcrt.lib /IGNORE:4099 %(AdditionalOptions)</AdditionalOptions>
@@ -217,6 +217,11 @@
   <ItemGroup>
     <None Include="src\shaders\FragmentShader.frag" />
     <None Include="src\shaders\VertexShader.vert" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\OpenGLUtilities\OpenGLUtilities.vcxproj">
+      <Project>{a97cbe6d-7139-40e0-9126-197b451e9b40}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
