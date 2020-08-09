@@ -258,7 +258,7 @@ public:
         leftEdgeOfWrist(-0.5, 0.0f, 0.0f),
         upperLeftFingerPos(-0.6f, 0.0f, 0.0f),
         endOfUpperLeftFinger(-0.8f, 0.0f, 0.0f),
-        lowerLeftFingerAngle(-90),
+        lowerLeftFingerAngle(-80),
         lowerLeftFingerPos(0.6,0.0f,0.0f)
     {
     }
@@ -368,22 +368,22 @@ public:
     void IncrementForeArmAngle()
     {
         foreArmAngle += 5.0f;
-        Clamp(foreArmAngle, 100, 120);
+        Clamp(foreArmAngle, 80, 140);
     }
     void DecrementForeArmAngle()
     {
         foreArmAngle -= 5.0f;
-        Clamp(foreArmAngle, 100, 120);
+        Clamp(foreArmAngle, 80, 140);
     }
     void IncrementFingerAngle()
     {
         upperFingerAngle += 5.0f;
-        Clamp(upperFingerAngle, -50, -10);
+        Clamp(upperFingerAngle, -60, 30);
     }
     void DecrementFingerAngle()
     {
         upperFingerAngle -= 5.0f;
-        Clamp(upperFingerAngle, -50, -10);
+        Clamp(upperFingerAngle, -60, 30);
     }
     void DrawCube(MatrixStack& modelToCameraStack)
     {
