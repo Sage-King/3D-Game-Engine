@@ -99,7 +99,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>GLEW_STATIC;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(SolutionDir)$(ProjectName)\src\headers;$(SolutionDir)3D-Game-Engine\Dependencies\glfw\include;$(SolutionDir)3D-Game-Engine\Dependencies\glew\include;$(SolutionDir)3D-Game-Engine\Dependencies\glm-0.9.9.8\glm\glm</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)$(ProjectName)\src\headers;$(SolutionDir)3D-Game-Engine\Dependencies\glfw\include;$(SolutionDir)3D-Game-Engine\Dependencies\glew\include;$(SolutionDir)3D-Game-Engine\Dependencies\glm</AdditionalIncludeDirectories>
       <UndefinePreprocessorDefinitions>GLEW_BUILD;</UndefinePreprocessorDefinitions>
     </ClCompile>
     <Link>
