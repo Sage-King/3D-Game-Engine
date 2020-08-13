@@ -18,13 +18,11 @@
 #include <stack>
 #include <deque>
 
-
-
 #define PI 3.14159f
 
 GLuint programHandle, vbo,vao1, vao2,ibo;
 GLuint cubeBuffer, cubeArray, cubeIbo;
-GLuint offsetUniform, cameraToClipUniform, modelToCameraUniform;
+GLuint transformationMatUniform;
 GLFWwindow* window;
 
 float incrementalAngleX = 0.0f, incrementalAngleY = 0.0f, incrementalAngleZ = 0.0f;
@@ -126,6 +124,73 @@ const GLshort indexData[] =
     7, 6, 4,
     6, 7, 5,
 };
+
+class Camera {
+public:
+    Camera()
+        :
+        matrixStack()
+    {
+
+    }
+    glm::mat4 DetermineWorldToCamera() 
+    {
+        return glm::inverse(matrixStack.Top());
+    }
+    void IncrementXAngle()
+    {
+        matrixStack.rotateX(5.0);
+    }
+    void DecrementXAngle()
+    {
+        matrixStack.rotateX(-5.0f);
+    }
+    void IncrementYAngle()
+    {
+        matrixStack.rotateY(5.0);
+    }
+    void DecrementYAngle()
+    {
+        matrixStack.rotateY(-5.0f);
+    }
+    void IncrementZAngle()
+    {
+        matrixStack.rotateZ(5.0);
+    }
+    void DecrementZAngle()
+    {
+        matrixStack.rotateZ(-5.0f);
+    }
+    void IncrementXPos()
+    {
+        matrixStack.translate(glm::vec3(1.0f, 0.0f, 0.0f));
+    }
+    void DecrementXPos()
+    {
+        matrixStack.translate(glm::vec3(-1.0f, 0.0f, 0.0f));
+    }
+    void IncrementYPos()
+    {
+        matrixStack.translate(glm::vec3(0.0f, 1.0f, 0.0f));
+    }
+    void DecrementYPos()
+    {
+        matrixStack.translate(glm::vec3(0.0f, -1.0f, 0.0f));
+    }
+    void IncrementZPos()
+    {
+        matrixStack.translate(glm::vec3(0.0f, 0.0f, 1.0f));
+    }
+    void DecrementZPos()
+    {
+        matrixStack.translate(glm::vec3(0.0f, 0.0f, -1.0f));
+    }
+private:
+    MatrixStack matrixStack;
+};
+
+Camera camera;
+
 class Armature
 {
 public:
@@ -160,7 +225,7 @@ public:
     {
     }
 
-    void Draw()
+    void Draw(glm::mat4 cameraToClipMatrix, glm::mat4 worldToCameraMatrix)
     {
         MatrixStack matrixStack;
 
@@ -173,12 +238,13 @@ public:
 
         matrixStack.PushTop();
         matrixStack.translate(baseLeftPos);
-        DrawCube(matrixStack);
+        DrawCube(matrixStack, cameraToClipMatrix,worldToCameraMatrix);
         matrixStack.Pop();
 
         matrixStack.PushTop();
         matrixStack.translate(baseRightPos);
-        DrawCube(matrixStack);
+        DrawCube(matrixStack, cameraToClipMatrix, worldToCameraMatrix);
+
         matrixStack.Pop();
 
         matrixStack.Pop();
@@ -188,7 +254,8 @@ public:
 
         matrixStack.PushTop();
         matrixStack.scale(upperArmScale);
-        DrawCube(matrixStack);
+        DrawCube(matrixStack, cameraToClipMatrix, worldToCameraMatrix);
+
         matrixStack.Pop();
 
         matrixStack.translate(endOfUpperArm);
@@ -197,11 +264,13 @@ public:
 
         matrixStack.PushTop();
         matrixStack.scale(foreArmScale);
-        DrawCube(matrixStack);
+        DrawCube(matrixStack, cameraToClipMatrix, worldToCameraMatrix);
+
         matrixStack.Pop();
 
         matrixStack.translate(endOfForeArm);
-        DrawCube(matrixStack);
+        DrawCube(matrixStack, cameraToClipMatrix, worldToCameraMatrix);
+
 
         matrixStack.PushTop();
         matrixStack.translate(rightEdgeOfWrist);
@@ -210,7 +279,8 @@ public:
 
         matrixStack.PushTop();
         matrixStack.scale(upperFingerScale);
-        DrawCube(matrixStack);
+        DrawCube(matrixStack, cameraToClipMatrix, worldToCameraMatrix);
+
         matrixStack.Pop();
 
         matrixStack.translate(endOfUpperRightFinger);
@@ -218,7 +288,8 @@ public:
         matrixStack.translate(lowerRightFingerPos);
         matrixStack.PushTop();
         matrixStack.scale(lowerFingerScale);
-        DrawCube(matrixStack);
+        DrawCube(matrixStack, cameraToClipMatrix, worldToCameraMatrix);
+
         matrixStack.Pop();
         matrixStack.Pop();
 
@@ -228,7 +299,8 @@ public:
         matrixStack.translate(upperLeftFingerPos);
         matrixStack.PushTop();
         matrixStack.scale(upperFingerScale);
-        DrawCube(matrixStack);
+        DrawCube(matrixStack, cameraToClipMatrix, worldToCameraMatrix);
+
         matrixStack.Pop();
 
         matrixStack.PushTop();
@@ -238,7 +310,8 @@ public:
 
         matrixStack.PushTop();
         matrixStack.scale(lowerFingerScale);
-        DrawCube(matrixStack);
+        DrawCube(matrixStack, cameraToClipMatrix, worldToCameraMatrix);
+
         matrixStack.Pop();
         matrixStack.Pop();
     }
@@ -282,11 +355,14 @@ public:
         upperFingerAngle -= 5.0f;
         Clamp(upperFingerAngle, -60, 30);
     }
-    void DrawCube(MatrixStack& modelToCameraStack)
+    void DrawCube(MatrixStack& modelToWorldStack, glm::mat4 cameraToClipMatrix, glm::mat4 worldToCameraMatrix)
     {
+        glm::mat4 gpuMatrix(1.0f);
+        gpuMatrix =  cameraToClipMatrix * worldToCameraMatrix * modelToWorldStack.Top() * gpuMatrix;
+
         glUseProgram(programHandle);
         glBindVertexArray(cubeArray);
-        glUniformMatrix4fv(modelToCameraUniform, 1, GL_FALSE, glm::value_ptr(modelToCameraStack.Top()));
+        glUniformMatrix4fv(transformationMatUniform, 1, GL_FALSE, glm::value_ptr(gpuMatrix));
         glDrawElements(GL_TRIANGLES, sizeof(cubeIndex) / sizeof(cubeIndex[0]), GL_UNSIGNED_SHORT, 0);
         glUseProgram(0);
         glBindVertexArray(0);
@@ -601,10 +677,6 @@ void framebufferResizeCallback(GLFWwindow* window, int width, int height)
     cameraToClip[0][0] = frustumScaleF / (width / (float)height);
     cameraToClip[1][1] = frustumScaleF;
 
-    glUseProgram(programHandle);
-    glUniformMatrix4fv(cameraToClipUniform, 1, GL_FALSE, glm::value_ptr(cameraToClip));
-    glUseProgram(0);
-
     glViewport(0, 0, width, height);
 }
 
@@ -665,6 +737,91 @@ void keyboardCallback(GLFWwindow* window, int key, int scancode, int action, int
             armature.DecrementFingerAngle();
         if (action == GLFW_REPEAT)
             armature.DecrementFingerAngle();
+        break;
+
+    case GLFW_KEY_D:
+        if (action == GLFW_PRESS)
+            camera.DecrementXAngle();
+        if (action == GLFW_REPEAT)
+            camera.DecrementXAngle();
+        break;
+
+    case GLFW_KEY_E:
+        if (action == GLFW_PRESS)
+            camera.IncrementXAngle();
+        if (action == GLFW_REPEAT)
+            camera.IncrementXAngle();
+        break;
+
+    case GLFW_KEY_W:
+        if (action == GLFW_PRESS)
+            camera.DecrementYAngle();
+        if (action == GLFW_REPEAT)
+            camera.DecrementYAngle();
+        break;
+
+    case GLFW_KEY_Q:
+        if (action == GLFW_PRESS)
+            camera.IncrementYAngle();
+        if (action == GLFW_REPEAT)
+            camera.IncrementYAngle();
+        break;
+
+    case GLFW_KEY_A:
+        if (action == GLFW_PRESS)
+            camera.DecrementZAngle();
+        if (action == GLFW_REPEAT)
+            camera.DecrementZAngle();
+        break;
+
+    case GLFW_KEY_S:
+        if (action == GLFW_PRESS)
+            camera.IncrementZAngle();
+        if (action == GLFW_REPEAT)
+            camera.IncrementZAngle();
+        break;
+
+    case GLFW_KEY_F:
+        if (action == GLFW_PRESS)
+            camera.IncrementXPos();
+        if (action == GLFW_REPEAT)
+            camera.IncrementXPos();
+        break;
+
+    case GLFW_KEY_V:
+        if (action == GLFW_PRESS)
+            camera.DecrementXPos();
+        if (action == GLFW_REPEAT)
+            camera.DecrementXPos();
+        break;
+
+
+    case GLFW_KEY_G:
+        if (action == GLFW_PRESS)
+            camera.IncrementYPos();
+        if (action == GLFW_REPEAT)
+            camera.IncrementYPos();
+        break;
+
+    case GLFW_KEY_B:
+        if (action == GLFW_PRESS)
+            camera.DecrementYPos();
+        if (action == GLFW_REPEAT)
+            camera.DecrementYPos();
+        break;
+
+    case GLFW_KEY_H:
+        if (action == GLFW_PRESS)
+            camera.IncrementZPos();
+        if (action == GLFW_REPEAT)
+            camera.IncrementZPos();
+        break;
+
+    case GLFW_KEY_N:
+        if (action == GLFW_PRESS)
+            camera.DecrementZPos();
+        if (action == GLFW_REPEAT)
+            camera.DecrementZPos();
         break;
     }
 }
@@ -809,19 +966,7 @@ void init()
     cameraToClip[3][2] = (camNearF * camFarF * 2) / (camNearF - camFarF);
     cameraToClip[2][3] = -1;
 
-    cameraToClipUniform = glGetUniformLocation(programHandle, "cameraToClip");
-    modelToCameraUniform = glGetUniformLocation(programHandle, "modelToCamera");
-
-    glUseProgram(programHandle);
-    glUniformMatrix4fv(cameraToClipUniform, 1, GL_FALSE, glm::value_ptr(cameraToClip));
-    glm::mat4 modelToCamera(1.0f);
-    modelToCamera[3] = glm::vec4(0.0f, 0.0f, -20.0f, 1.0f);
-    modelToCamera[1].y = cosf(PI / 2);
-    modelToCamera[1].z = -sinf(PI / 2);
-    modelToCamera[2].y = sinf(PI / 2);
-    modelToCamera[2].z = cosf(PI / 2);
-    glUniformMatrix4fv(modelToCameraUniform, 1, GL_FALSE, glm::value_ptr(modelToCamera));
-    glUseProgram(0);    
+    transformationMatUniform = glGetUniformLocation(programHandle, "transformationMat"); 
 
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
@@ -833,19 +978,14 @@ void init()
     glDepthRange(0.0f, 1.0f);
 }
 
-glm::mat4 uploadmat(1.0f);
-
-glm::vec3 offset(0.0f, 0.0f, -20.0);
-
-
 //called every loop
 void draw()
 {
     glClearDepth(1.0f);
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    
-    armature.Draw();
+
+    armature.Draw(cameraToClip, camera.DetermineWorldToCamera());
     
     glfwSwapBuffers(window);
     glfwPollEvents();
