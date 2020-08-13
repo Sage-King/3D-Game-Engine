@@ -27,6 +27,8 @@ GLFWwindow* window;
 
 float incrementalAngleX = 0.0f, incrementalAngleY = 0.0f, incrementalAngleZ = 0.0f;
 
+double pastMouseX = 0, pastMouseY = 0;
+
 MatrixStack matrixStack;
 
 std::chrono::time_point<std::chrono::steady_clock> startOfProgram;
@@ -139,19 +141,19 @@ public:
     }
     void IncrementXAngle()
     {
-        matrixStack.rotateX(5.0);
+        matrixStack.rotateX(0.5f);
     }
     void DecrementXAngle()
     {
-        matrixStack.rotateX(-5.0f);
+        matrixStack.rotateX(-0.5f);
     }
     void IncrementYAngle()
     {
-        matrixStack.rotateY(5.0);
+        matrixStack.rotateY(0.5f);
     }
     void DecrementYAngle()
     {
-        matrixStack.rotateY(-5.0f);
+        matrixStack.rotateY(-0.5f);
     }
     void IncrementZAngle()
     {
@@ -684,6 +686,10 @@ void keyboardCallback(GLFWwindow* window, int key, int scancode, int action, int
 {
     switch(key){
 
+    case GLFW_KEY_ESCAPE:
+        if (action == GLFW_PRESS)
+            glfwSetWindowShouldClose(window, GLFW_TRUE);
+
     case GLFW_KEY_0:
         if (action == GLFW_PRESS)
             armature.IncrementBaseAngle();
@@ -739,91 +745,78 @@ void keyboardCallback(GLFWwindow* window, int key, int scancode, int action, int
             armature.DecrementFingerAngle();
         break;
 
-    case GLFW_KEY_D:
+    case GLFW_KEY_Q:
         if (action == GLFW_PRESS)
-            camera.DecrementXAngle();
+            camera.IncrementZAngle();
         if (action == GLFW_REPEAT)
-            camera.DecrementXAngle();
+            camera.IncrementZAngle();
         break;
 
     case GLFW_KEY_E:
         if (action == GLFW_PRESS)
-            camera.IncrementXAngle();
+            camera.DecrementZAngle();
         if (action == GLFW_REPEAT)
-            camera.IncrementXAngle();
-        break;
-
-    case GLFW_KEY_W:
-        if (action == GLFW_PRESS)
-            camera.DecrementYAngle();
-        if (action == GLFW_REPEAT)
-            camera.DecrementYAngle();
-        break;
-
-    case GLFW_KEY_Q:
-        if (action == GLFW_PRESS)
-            camera.IncrementYAngle();
-        if (action == GLFW_REPEAT)
-            camera.IncrementYAngle();
+            camera.DecrementZAngle();
         break;
 
     case GLFW_KEY_A:
         if (action == GLFW_PRESS)
-            camera.DecrementZAngle();
+            camera.DecrementXPos();
         if (action == GLFW_REPEAT)
-            camera.DecrementZAngle();
+            camera.DecrementXPos();
+        break;
+      
+
+    case GLFW_KEY_D:
+        if (action == GLFW_PRESS)
+            camera.IncrementXPos();
+        if (action == GLFW_REPEAT)
+            camera.IncrementXPos();
+        break;
+
+    case GLFW_KEY_W:
+        if (action == GLFW_PRESS)
+            camera.DecrementZPos();
+        if (action == GLFW_REPEAT)
+            camera.DecrementZPos();
         break;
 
     case GLFW_KEY_S:
         if (action == GLFW_PRESS)
-            camera.IncrementZAngle();
+            camera.IncrementZPos();
         if (action == GLFW_REPEAT)
-            camera.IncrementZAngle();
+            camera.IncrementZPos();
+        break;
+
+    case GLFW_KEY_R:
+        if (action == GLFW_PRESS)
+            camera.IncrementYPos();
+        if (action == GLFW_REPEAT)
+            camera.IncrementYPos();
         break;
 
     case GLFW_KEY_F:
         if (action == GLFW_PRESS)
-            camera.IncrementXPos();
-        if (action == GLFW_REPEAT)
-            camera.IncrementXPos();
-        break;
-
-    case GLFW_KEY_V:
-        if (action == GLFW_PRESS)
-            camera.DecrementXPos();
-        if (action == GLFW_REPEAT)
-            camera.DecrementXPos();
-        break;
-
-
-    case GLFW_KEY_G:
-        if (action == GLFW_PRESS)
-            camera.IncrementYPos();
-        if (action == GLFW_REPEAT)
-            camera.IncrementYPos();
-        break;
-
-    case GLFW_KEY_B:
-        if (action == GLFW_PRESS)
             camera.DecrementYPos();
         if (action == GLFW_REPEAT)
             camera.DecrementYPos();
-        break;
-
-    case GLFW_KEY_H:
-        if (action == GLFW_PRESS)
-            camera.IncrementZPos();
-        if (action == GLFW_REPEAT)
-            camera.IncrementZPos();
-        break;
-
-    case GLFW_KEY_N:
-        if (action == GLFW_PRESS)
-            camera.DecrementZPos();
-        if (action == GLFW_REPEAT)
-            camera.DecrementZPos();
         break;
     }
+}
+
+void mousePosCallback(GLFWwindow* window, double xpos, double ypos)
+{
+    if (pastMouseX > xpos)
+        camera.IncrementYAngle();
+    if (pastMouseX < xpos)
+        camera.DecrementYAngle();
+    if (pastMouseY > ypos)
+        camera.IncrementXAngle();
+    if (pastMouseY < ypos)
+        camera.DecrementXAngle();
+
+    pastMouseX = xpos;
+    pastMouseY = ypos;
 }
 
 void initOpenGL()
@@ -848,6 +841,10 @@ void initOpenGL()
 
     glfwSetKeyCallback(window, keyboardCallback);
 
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    if (glfwRawMouseMotionSupported())
+        glfwSetInputMode(window, GLFW_RAW_MOUSE_MOTION, GLFW_TRUE);
+    glfwSetCursorPosCallback(window, mousePosCallback);
 #ifdef _DEBUG
     glEnable(GL_DEBUG_OUTPUT);
     glDebugMessageCallback(MessageCallback, 0);
