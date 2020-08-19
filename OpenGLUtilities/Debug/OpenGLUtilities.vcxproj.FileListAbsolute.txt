@@ -1,2 +1,0 @@
-D:\Repos\3D-Game-Engine\Debug\OpenGLUtilities.pdb
-D:\Repos\3D-Game-Engine\OpenGLUtilities\Debug\OpenGLUtilities.pdb
