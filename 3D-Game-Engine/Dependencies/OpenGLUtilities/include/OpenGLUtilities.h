@@ -1,6 +1,7 @@
 #pragma once
 
 #include "glm.hpp"
+#include "gtc/quaternion.hpp"
 
 #include <stack>
 #include <deque>
@@ -60,10 +61,21 @@ public:
     {
         matrixStack.top() = matrixStack.top() * glm::mat4(RotateZ(angleInDegrees));
     }
+    void RotateQuat(glm::vec3 inAxis, float angleInRadians, glm::fquat& inOrientation)
+    {
+        inAxis = glm::normalize(inAxis);
+        glm::fquat angularDisplacement(cosf(angleInRadians/2), inAxis * sinf(angleInRadians/2));
+        inOrientation = inOrientation * angularDisplacement;
+        inOrientation = glm::normalize(inOrientation);
+    }
     void Pop()
     {
         if (!matrixStack.empty())
             matrixStack.pop();
+    }
+    void ApplyMatrix(glm::mat4 inMatrix)
+    {
+        matrixStack.top() = matrixStack.top() * inMatrix;
     }
 private:
     std::stack<glm::mat4> matrixStack;

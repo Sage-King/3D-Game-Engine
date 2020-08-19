@@ -17,6 +17,9 @@
 #include <fstream>
 #include <stack>
 #include <deque>
+#include <array>
+#include <unordered_map>
+#include <vector>
 
 #define PI 3.14159f
 
@@ -28,10 +31,13 @@ GLFWwindow* window;
 float incrementalAngleX = 0.0f, incrementalAngleY = 0.0f, incrementalAngleZ = 0.0f;
 
 double pastMouseX = 0, pastMouseY = 0;
+float lastX, lastY;
 
 MatrixStack matrixStack;
 
-std::chrono::time_point<std::chrono::steady_clock> startOfProgram;
+float currentFrameTime = 0.0f, lastFrameTime = 0.0f, deltaTime = 0.0f;
+
+bool firstMouseEntry = true;
 
 glm::mat4 cameraToClip;
 
@@ -127,68 +133,108 @@ const GLshort indexData[] =
     6, 7, 5,
 };
 
-class Camera {
+void printMat4(glm::mat4 inMat)
+{
+
+    std::cout << inMat[0].x << " ";
+    std::cout << inMat[1].x << " ";
+    std::cout << inMat[2].x << " ";
+    std::cout << inMat[3].x << '\n';
+
+    std::cout << inMat[0].y << " ";
+    std::cout << inMat[1].y << " ";
+    std::cout << inMat[2].y << " ";
+    std::cout << inMat[3].y << '\n';
+
+    std::cout << inMat[0].z << " ";
+    std::cout << inMat[1].z << " ";
+    std::cout << inMat[2].z << " ";
+    std::cout << inMat[3].z << '\n';
+
+    std::cout << inMat[0].w << " ";
+    std::cout << inMat[1].w << " ";
+    std::cout << inMat[2].w << " ";
+    std::cout << inMat[3].w << '\n' << std::endl;
+}
+
+void printFQuat(glm::fquat inQuat)
+{
+    std::cout << inQuat.x << '\n';
+    std::cout << inQuat.y << '\n';
+    std::cout << inQuat.z << '\n';
+    std::cout << inQuat.w << std::endl;
+}
+
+glm::mat3 Transpose3x3OfMat4(const glm::mat4& inMatrix)
+{
+    glm::mat3 retMatrix(1.0f);
+    retMatrix[1].x = inMatrix[0].y;
+    retMatrix[2].x = inMatrix[0].z;
+    retMatrix[2].y = inMatrix[1].z;
+
+    retMatrix[0].y = inMatrix[1].x;
+    retMatrix[0].z = inMatrix[2].x;
+    retMatrix[1].z = inMatrix[2].y;
+ 
+    return retMatrix;
+}
+
+glm::vec3 InvertTranslateOfMat4(const glm::mat4& inMatrix)
+{
+    glm::vec3 retVec(0.0f, 0.0f, 0.0f);
+    retVec.x = inMatrix[3].x;
+    retVec.y = inMatrix[3].y;
+    retVec.z = inMatrix[3].z;
+    return retVec;
+}
+
+class Camera{
 public:
     Camera()
         :
-        matrixStack()
+        pos(0.0f,0.0f,0.0f),
+        focus(0.0f, 0.0f, -20.0f),
+        cameraDirection(pos-focus)
     {
+    }
+    glm::mat4 DetermineWorldToCamera()
+    {
+        cameraDirection.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+        cameraDirection.y = sin(glm::radians(pitch));
+        cameraDirection.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
 
+        cameraZ = glm::normalize(cameraDirection);
+        cameraX = glm::normalize(glm::cross(up,cameraZ));
+        cameraY = glm::normalize(glm::cross(cameraZ, cameraX));
+
+        glm::mat4 retMatrix(1.0f);
+        retMatrix[0].x = cameraX.x;
+        retMatrix[1].x = cameraX.y;
+        retMatrix[2].x = cameraX.z;
+
+        retMatrix[0].y = cameraY.x;
+        retMatrix[1].y = cameraY.y;
+        retMatrix[2].y = cameraY.z;
+
+        retMatrix[0].z = cameraZ.x; 
+        retMatrix[1].z = cameraZ.y;
+        retMatrix[2].z = cameraZ.z;
+
+        retMatrix[3].x = -glm::dot(cameraX, pos);
+        retMatrix[3].y = -glm::dot(cameraY, pos);
+        retMatrix[3].z = -glm::dot(cameraZ, pos);
+
+        //glm::mat4 retMatrix = glm::lookAt(pos, focus, up);
+
+        return retMatrix;
     }
-    glm::mat4 DetermineWorldToCamera() 
-    {
-        return glm::inverse(matrixStack.Top());
-    }
-    void IncrementXAngle()
-    {
-        matrixStack.rotateX(0.5f);
-    }
-    void DecrementXAngle()
-    {
-        matrixStack.rotateX(-0.5f);
-    }
-    void IncrementYAngle()
-    {
-        matrixStack.rotateY(0.5f);
-    }
-    void DecrementYAngle()
-    {
-        matrixStack.rotateY(-0.5f);
-    }
-    void IncrementZAngle()
-    {
-        matrixStack.rotateZ(5.0);
-    }
-    void DecrementZAngle()
-    {
-        matrixStack.rotateZ(-5.0f);
-    }
-    void IncrementXPos()
-    {
-        matrixStack.translate(glm::vec3(1.0f, 0.0f, 0.0f));
-    }
-    void DecrementXPos()
-    {
-        matrixStack.translate(glm::vec3(-1.0f, 0.0f, 0.0f));
-    }
-    void IncrementYPos()
-    {
-        matrixStack.translate(glm::vec3(0.0f, 1.0f, 0.0f));
-    }
-    void DecrementYPos()
-    {
-        matrixStack.translate(glm::vec3(0.0f, -1.0f, 0.0f));
-    }
-    void IncrementZPos()
-    {
-        matrixStack.translate(glm::vec3(0.0f, 0.0f, 1.0f));
-    }
-    void DecrementZPos()
-    {
-        matrixStack.translate(glm::vec3(0.0f, 0.0f, -1.0f));
-    }
+
 private:
-    MatrixStack matrixStack;
+    glm::vec3 cameraZ, cameraX, cameraY, cameraDirection;
+    const glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
+public:
+    glm::vec3 focus, pos;
+    float yaw = 90.0f, pitch = 0.0f;
 };
 
 Camera camera;
@@ -395,7 +441,6 @@ private:
 
     glm::vec3 lowerRightFingerPos, lowerLeftFingerPos, lowerFingerScale;
     float lowerRightFingerAngle, lowerLeftFingerAngle;
-
 };
 
 Armature armature;
@@ -684,139 +729,163 @@ void framebufferResizeCallback(GLFWwindow* window, int width, int height)
 
 void keyboardCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
-    switch(key){
 
-    case GLFW_KEY_ESCAPE:
-        if (action == GLFW_PRESS)
+    if (action == GLFW_PRESS)
+    {
+        switch (key) {
+        case GLFW_KEY_ESCAPE:
             glfwSetWindowShouldClose(window, GLFW_TRUE);
-
-    case GLFW_KEY_0:
-        if (action == GLFW_PRESS)
-            armature.IncrementBaseAngle();
-        if (action == GLFW_REPEAT)
-            armature.IncrementBaseAngle();
-        break;
-    
-    case GLFW_KEY_9:
-        if (action == GLFW_PRESS)
-            armature.DecrementBaseAngle();
-        if (action == GLFW_REPEAT)
-            armature.DecrementBaseAngle();
-        break;
-
-    case GLFW_KEY_8:
-        if (action == GLFW_PRESS)
-            armature.IncrementUpperArmAngle();
-        if (action == GLFW_REPEAT)
-            armature.IncrementUpperArmAngle();
-        break;
-
-    case GLFW_KEY_7:
-        if (action == GLFW_PRESS)
-            armature.DecrementUpperArmAngle();
-        if (action == GLFW_REPEAT)
-            armature.DecrementUpperArmAngle();
-        break;
-
-    case GLFW_KEY_P:
-        if (action == GLFW_PRESS)
-            armature.IncrementForeArmAngle();
-        if (action == GLFW_REPEAT)
-            armature.IncrementForeArmAngle();
-        break;
-
-    case GLFW_KEY_O:
-        if (action == GLFW_PRESS)
-            armature.DecrementForeArmAngle();
-        if (action == GLFW_REPEAT)
-            armature.DecrementForeArmAngle();
-        break;
-    case GLFW_KEY_I:
-        if (action == GLFW_PRESS)
-            armature.IncrementFingerAngle();
-        if (action == GLFW_REPEAT)
-            armature.IncrementFingerAngle();
-        break;
-
-    case GLFW_KEY_U:
-        if (action == GLFW_PRESS)
-            armature.DecrementFingerAngle();
-        if (action == GLFW_REPEAT)
-            armature.DecrementFingerAngle();
-        break;
-
-    case GLFW_KEY_Q:
-        if (action == GLFW_PRESS)
-            camera.IncrementZAngle();
-        if (action == GLFW_REPEAT)
-            camera.IncrementZAngle();
-        break;
-
-    case GLFW_KEY_E:
-        if (action == GLFW_PRESS)
-            camera.DecrementZAngle();
-        if (action == GLFW_REPEAT)
-            camera.DecrementZAngle();
-        break;
-
-    case GLFW_KEY_A:
-        if (action == GLFW_PRESS)
-            camera.DecrementXPos();
-        if (action == GLFW_REPEAT)
-            camera.DecrementXPos();
-        break;
-      
-
-    case GLFW_KEY_D:
-        if (action == GLFW_PRESS)
-            camera.IncrementXPos();
-        if (action == GLFW_REPEAT)
-            camera.IncrementXPos();
-        break;
-
-    case GLFW_KEY_W:
-        if (action == GLFW_PRESS)
-            camera.DecrementZPos();
-        if (action == GLFW_REPEAT)
-            camera.DecrementZPos();
-        break;
-
-    case GLFW_KEY_S:
-        if (action == GLFW_PRESS)
-            camera.IncrementZPos();
-        if (action == GLFW_REPEAT)
-            camera.IncrementZPos();
-        break;
-
-    case GLFW_KEY_R:
-        if (action == GLFW_PRESS)
-            camera.IncrementYPos();
-        if (action == GLFW_REPEAT)
-            camera.IncrementYPos();
-        break;
-
-    case GLFW_KEY_F:
-        if (action == GLFW_PRESS)
-            camera.DecrementYPos();
-        if (action == GLFW_REPEAT)
-            camera.DecrementYPos();
-        break;
+            break;
+        case GLFW_KEY_ENTER:
+            //camera.Reset();
+            break;
+        case GLFW_KEY_0:
+            //camera.IncrementXAngle();
+            break;
+        }
+            
     }
+        
+    /*for (std::vector<int>::iterator iter = keyPressedVector.begin(); iter != keyPressedVector.end(); iter = keyPressedVector.begin())
+    {
+        switch (*iter) {
+
+        
+
+        case GLFW_KEY_0:
+            armature.IncrementBaseAngle();
+            keyPressedVector.erase(iter);
+            break;
+
+        case GLFW_KEY_9:
+            armature.DecrementBaseAngle();
+            break;
+
+        case GLFW_KEY_8:
+            armature.IncrementUpperArmAngle();
+            break;
+
+        case GLFW_KEY_7:
+            armature.DecrementUpperArmAngle();
+            break;
+
+        case GLFW_KEY_P:
+            armature.IncrementForeArmAngle();
+            break;
+
+        case GLFW_KEY_O:
+            armature.DecrementForeArmAngle();
+            break;
+        case GLFW_KEY_I:
+            armature.IncrementFingerAngle();
+            break;
+
+        case GLFW_KEY_U:
+            armature.DecrementFingerAngle();
+            break;
+
+        case GLFW_KEY_Q:
+            camera.IncrementZAngle();
+            break;
+
+        case GLFW_KEY_E:
+            camera.DecrementZAngle();
+            break;
+
+        case GLFW_KEY_A:
+            camera.DecrementXPos();
+            break;
+
+
+        case GLFW_KEY_D:
+            camera.IncrementXPos();
+            break;
+
+        case GLFW_KEY_W:
+            camera.DecrementZPos();
+            break;
+
+        case GLFW_KEY_S:
+            camera.IncrementZPos();
+            break;
+
+        case GLFW_KEY_R:
+            camera.IncrementYPos();
+            break;
+
+        case GLFW_KEY_F:
+            camera.DecrementYPos();
+            break;
+        }
+    }*/
 }
 
 void mousePosCallback(GLFWwindow* window, double xpos, double ypos)
 {
-    if (pastMouseX > xpos)
-        camera.IncrementYAngle();
-    if (pastMouseX < xpos)
-        camera.DecrementYAngle();
-    if (pastMouseY > ypos)
-        camera.IncrementXAngle();
-    if (pastMouseY < ypos)
-        camera.DecrementXAngle();
+    if (firstMouseEntry)
+    {
+        lastX = xpos;
+        lastY = ypos;
+        firstMouseEntry = false;
+    }
+    if (camera.pitch > 89.0f)
+        camera.pitch = 89.0f;
+    if (camera.pitch < -89.0f)
+        camera.pitch = -89.0f;
 
-    pastMouseX = xpos;
-    pastMouseY = ypos;
+    float xOffset = xpos - lastX;
+    float yOffset = ypos - lastY;
+    lastX = xpos;
+    lastY = ypos;
+
+    const float sensitivity = 0.1f;
+    xOffset *= sensitivity;
+    yOffset *= sensitivity;
+
+    camera.yaw += xOffset;
+    camera.pitch += yOffset;
+}
+
+void windowFocusCallback(GLFWwindow* window, int focused)
+{
+    if (focused)
+    {
+        firstMouseEntry = true;
+    }
+    else
+    {
+        
+    }
+}
+
+void handleKeyInputs()
+{
+    float movementNum = 144.0f * deltaTime;
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+    {
+        camera.pos.z -= movementNum;
+    }
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+    {
+        camera.pos.z += movementNum;
+    }
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+    {
+        camera.pos.x -= movementNum;
+    }
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+    {
+        camera.pos.x += movementNum;
+    }
+    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
+    {
+        camera.pos.y += movementNum;
+    }
+    if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
+    {
+        camera.pos.y -= movementNum;
+    }
+
 }
 
 void initOpenGL()
@@ -892,8 +961,6 @@ void initShaders()
 //called once before main loop
 void init()
 {
-    startOfProgram = std::chrono::steady_clock::now();
-
     initOpenGL();
     initShaders();
 
@@ -955,7 +1022,7 @@ void init()
     glBindVertexArray(0);
 
     const float camNearF = 1.0f;
-    const float camFarF = 100.0f;
+    const float camFarF = 10000.0f;
 
     cameraToClip[0][0] = frustumScaleF;
     cameraToClip[1][1] = frustumScaleF;
@@ -982,8 +1049,13 @@ void draw()
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    currentFrameTime = glfwGetTime();
+    deltaTime = currentFrameTime - lastFrameTime;
+    lastFrameTime = currentFrameTime;
+
+    handleKeyInputs();
     armature.Draw(cameraToClip, camera.DetermineWorldToCamera());
-    
+
     glfwSwapBuffers(window);
     glfwPollEvents();
 }
