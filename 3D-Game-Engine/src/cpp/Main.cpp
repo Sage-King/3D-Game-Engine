@@ -230,9 +230,9 @@ public:
     }
 
 private:
-    glm::vec3 cameraZ, cameraX, cameraY, cameraDirection;
     const glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
 public:
+    glm::vec3 cameraZ, cameraX, cameraY, cameraDirection;
     glm::vec3 focus, pos;
     float yaw = 90.0f, pitch = 0.0f;
 };
@@ -863,27 +863,31 @@ void handleKeyInputs()
     float movementNum = 144.0f * deltaTime;
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
     {
-        camera.pos.z -= movementNum;
+        camera.pos -= movementNum * camera.cameraZ;
     }
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
     {
-        camera.pos.z += movementNum;
+        camera.pos += movementNum * camera.cameraZ ;
     }
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
     {
-        camera.pos.x -= movementNum;
+        camera.pos -= movementNum * camera.cameraX;
+
     }
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
     {
-        camera.pos.x += movementNum;
+        camera.pos += movementNum * camera.cameraX;
+
     }
     if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
     {
-        camera.pos.y += movementNum;
+        camera.pos += movementNum * camera.cameraY;
+
     }
     if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
     {
-        camera.pos.y -= movementNum;
+        camera.pos -= movementNum * camera.cameraY;
+
     }
 
 }
