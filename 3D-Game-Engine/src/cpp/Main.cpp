@@ -366,11 +366,15 @@ public:
     void IncrementBaseAngle()
     {
         baseAngleY += 5.0;
+        if (baseAngleY > 360.0f)
+            baseAngleY -= 360.0f;
         //Clamp(baseAngleY, 0.0f, 90.0f);
     }
     void DecrementBaseAngle()
     {
         baseAngleY -= 5.0;
+        if (baseAngleY < -360.0f)
+            baseAngleY += 360.0f;
         //Clamp(baseAngleY, 0.0f, 90.0f);
     }
     void IncrementUpperArmAngle()
@@ -824,8 +828,8 @@ void mousePosCallback(GLFWwindow* window, double xpos, double ypos)
 {
     if (firstMouseEntry)
     {
-        lastX = xpos;
-        lastY = ypos;
+        lastX = (float)xpos;
+        lastY = (float)ypos;
         firstMouseEntry = false;
     }
     if (camera.pitch > 89.0f)
@@ -833,12 +837,12 @@ void mousePosCallback(GLFWwindow* window, double xpos, double ypos)
     if (camera.pitch < -89.0f)
         camera.pitch = -89.0f;
 
-    float xOffset = xpos - lastX;
-    float yOffset = ypos - lastY;
-    lastX = xpos;
-    lastY = ypos;
+    float xOffset = (float)xpos - lastX;
+    float yOffset = (float)ypos - lastY;
+    lastX = (float)xpos;
+    lastY = (float)ypos;
 
-    const float sensitivity = 0.1f;
+    const float sensitivity = 0.065f;
     xOffset *= sensitivity;
     yOffset *= sensitivity;
 
@@ -860,7 +864,7 @@ void windowFocusCallback(GLFWwindow* window, int focused)
 
 void handleKeyInputs()
 {
-    float movementNum = 144.0f * deltaTime;
+    float movementNum = 100.0f * deltaTime;
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
     {
         camera.pos -= movementNum * camera.cameraZ;
@@ -889,7 +893,38 @@ void handleKeyInputs()
         camera.pos -= movementNum * camera.cameraY;
 
     }
-
+    if (glfwGetKey(window, GLFW_KEY_0) == GLFW_PRESS)
+    {
+        armature.IncrementBaseAngle();
+    }
+    if (glfwGetKey(window, GLFW_KEY_9) == GLFW_PRESS)
+    {
+        armature.DecrementBaseAngle();
+    }
+    if (glfwGetKey(window, GLFW_KEY_8) == GLFW_PRESS)
+    {
+        armature.IncrementUpperArmAngle();
+    }
+    if (glfwGetKey(window, GLFW_KEY_7) == GLFW_PRESS)
+    {
+        armature.DecrementUpperArmAngle();
+    }
+    if (glfwGetKey(window, GLFW_KEY_6) == GLFW_PRESS)
+    {
+        armature.IncrementForeArmAngle();
+    }
+    if (glfwGetKey(window, GLFW_KEY_5) == GLFW_PRESS)
+    {
+        armature.DecrementForeArmAngle();
+    }
+    if (glfwGetKey(window, GLFW_KEY_4) == GLFW_PRESS)
+    {
+        armature.IncrementFingerAngle();
+    }
+    if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS)
+    {
+        armature.DecrementFingerAngle();
+    }
 }
 
 void initOpenGL()
@@ -1053,7 +1088,7 @@ void draw()
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    currentFrameTime = glfwGetTime();
+    currentFrameTime = (float)glfwGetTime();
     deltaTime = currentFrameTime - lastFrameTime;
     lastFrameTime = currentFrameTime;
 
