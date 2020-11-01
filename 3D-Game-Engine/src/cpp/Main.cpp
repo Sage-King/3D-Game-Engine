@@ -1,3 +1,22 @@
+/*
+--------------------------------------------------------------
+                           To-Do List
+      - Shader Class
+      - Textures
+      - Lighting
+      - Renderable Object Class 
+      - Model Loader
+      - More functional and flexible (no hard coding) 
+        input system
+      - Transition to CMake
+      - Get rid of as many globals as possible ;-; They're bad, I know.
+      - Relative File paths
+-------------------------------------------------------------
+                           Done List
+      - Textures part 1
+ */
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 #include <Windows.h>
 
 #include "glew.h"
@@ -7,6 +26,11 @@
 #include "gtc/matrix_transform.hpp"
 #include "gtc/type_ptr.hpp"
 #include "gtc/matrix_access.hpp"
+
+#include "Camera.h"
+#include "Armature.h"
+#include "Shader.h"
+#include "LightCube.h"
 
 #include "OpenGLUtilities.h"
 
@@ -23,10 +47,20 @@
 
 #define PI 3.14159f
 
-GLuint programHandle, vbo,vao1, vao2,ibo;
-GLuint cubeBuffer, cubeArray, cubeIbo;
-GLuint transformationMatUniform;
+
+std::vector<std::unique_ptr<Renderable>> renderables;
+Armature armature;
+LightCube lightCube;
+std::vector<Camera> cameras;
+Camera* currentCamera;
+
+GLuint texture, texture2;
+GLuint squareBuffer, squareArray, squareIbo, squareShader;
 GLFWwindow* window;
+
+int texWidth, texHeight, numOfColorChannels;
+
+unsigned char* data;
 
 float incrementalAngleX = 0.0f, incrementalAngleY = 0.0f, incrementalAngleZ = 0.0f;
 
@@ -39,9 +73,8 @@ float currentFrameTime = 0.0f, lastFrameTime = 0.0f, deltaTime = 0.0f;
 
 bool firstMouseEntry = true;
 
-glm::mat4 cameraToClip;
-
 const int numberOfVertices = 8;
+
 
 #define GREEN_COLOR 0.0f, 1.0f, 0.0f, 1.0f
 #define BLUE_COLOR 	0.0f, 0.0f, 1.0f, 1.0f
@@ -72,52 +105,6 @@ const float intersectingPyramids[] =
     BROWN_COLOR,
 };
 
-const float cubeVertices[] =
-{
-    -0.5f,   0.5f,  0.5f,
-     0.5f,   0.5f,  0.5f,
-    -0.5f,  -0.5f,  0.5f,
-     0.5f,  -0.5f,  0.5f,
-
-    -0.5f,  0.5f, -0.5f,
-     0.5f,  0.5f, -0.5f,
-    -0.5f, -0.5f, -0.5f,
-     0.5f, -0.5f, -0.5f,
-
-    1.0f, 0.0f, 0.0f, 1.0f,
-    0.0f, 1.0f, 0.0f, 1.0f,
-    0.0f, 0.0f, 1.0f, 1.0f,
-    1.0f, 0.0f, 1.0f, 1.0f,
-
-    0.0f, 1.0f, 1.0f, 1.0f,
-    1.0f, 1.0f, 0.0f, 1.0f,
-    1.0f, 1.0f, 1.0f, 1.0f,
-    0.41176f, 1.0f, 0.86274f,1.0f
-
-};
-
-const GLushort cubeIndex[] =
-{
-    //front
-    0,1,3,
-    0,3,2,
-    //right
-    1,5,7,
-    1,7,3,
-    //back
-    5,4,6,
-    5,6,7,
-    //left
-    4,0,2,
-    4,2,6,
-    //top
-    4,5,1,
-    4,1,0,
-    //bottom
-    2,3,7,
-    2,7,6
-};
-
 const GLshort indexData[] =
 {
     0, 1, 2,
@@ -132,6 +119,22 @@ const GLshort indexData[] =
     7, 6, 4,
     6, 7, 5,
 };
+
+const float squareVertices[] =
+{
+    //pos, rgb, tex
+    1.0f, 1.0f,0.0f,   1.0f,0.0f,0.0f,   1.0f,1.0f,
+    1.0f,-1.0f,0.0f,   0.0f,1.0f,0.0f,   1.0f,0.0f,
+   -1.0f,-1.0f,0.0f,   0.0f,0.0f,1.0f,   0.0f,0.0f,
+   -1.0f, 1.0f,0.0f,   1.0f,1.0f,1.0f,   0.0f,1.0f
+};
+
+const unsigned short squareIndex[] =
+{
+    0, 1, 3,
+    1, 2, 3,
+};
+
 
 void printMat4(glm::mat4 inMat)
 {
@@ -165,439 +168,38 @@ void printFQuat(glm::fquat inQuat)
     std::cout << inQuat.w << std::endl;
 }
 
-glm::mat3 Transpose3x3OfMat4(const glm::mat4& inMatrix)
-{
-    glm::mat3 retMatrix(1.0f);
-    retMatrix[1].x = inMatrix[0].y;
-    retMatrix[2].x = inMatrix[0].z;
-    retMatrix[2].y = inMatrix[1].z;
-
-    retMatrix[0].y = inMatrix[1].x;
-    retMatrix[0].z = inMatrix[2].x;
-    retMatrix[1].z = inMatrix[2].y;
- 
-    return retMatrix;
-}
-
-glm::vec3 InvertTranslateOfMat4(const glm::mat4& inMatrix)
-{
-    glm::vec3 retVec(0.0f, 0.0f, 0.0f);
-    retVec.x = inMatrix[3].x;
-    retVec.y = inMatrix[3].y;
-    retVec.z = inMatrix[3].z;
-    return retVec;
-}
-
-class Camera{
-public:
-    Camera()
-        :
-        pos(0.0f,0.0f,0.0f),
-        focus(0.0f, 0.0f, -20.0f),
-        cameraDirection(pos-focus)
-    {
-    }
-    glm::mat4 DetermineWorldToCamera()
-    {
-        cameraDirection.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-        cameraDirection.y = sin(glm::radians(pitch));
-        cameraDirection.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-
-        cameraZ = glm::normalize(cameraDirection);
-        cameraX = glm::normalize(glm::cross(up,cameraZ));
-        cameraY = glm::normalize(glm::cross(cameraZ, cameraX));
-
-        glm::mat4 retMatrix(1.0f);
-        retMatrix[0].x = cameraX.x;
-        retMatrix[1].x = cameraX.y;
-        retMatrix[2].x = cameraX.z;
-
-        retMatrix[0].y = cameraY.x;
-        retMatrix[1].y = cameraY.y;
-        retMatrix[2].y = cameraY.z;
-
-        retMatrix[0].z = cameraZ.x; 
-        retMatrix[1].z = cameraZ.y;
-        retMatrix[2].z = cameraZ.z;
-
-        retMatrix[3].x = -glm::dot(cameraX, pos);
-        retMatrix[3].y = -glm::dot(cameraY, pos);
-        retMatrix[3].z = -glm::dot(cameraZ, pos);
-
-        //glm::mat4 retMatrix = glm::lookAt(pos, focus, up);
-
-        return retMatrix;
-    }
-
-private:
-    const glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f);
-public:
-    glm::vec3 cameraZ, cameraX, cameraY, cameraDirection;
-    glm::vec3 focus, pos;
-    float yaw = 90.0f, pitch = 0.0f;
-};
-
-Camera camera;
-
-class Armature
-{
-public:
-    Armature()
-        :
-        basePos(-5.0f, -5.0f, -20.0f),
-        baseAngleY(45),
-        baseScale(1.0f, 1.0f, 2.0f),
-        baseLeftPos(1.0f, 0.0f, 0.0f),
-        baseRightPos(-1.0f, 0.0f, 0.0f),
-        upperArmAngle(-60.0),
-        upperArmScale(1.0f, 1.0f, 5.0f),
-        upperArmPos(0.0f, 0.5f, 2.5f),
-        endOfUpperArm(0.0f, 0.0f, 2.5f),
-        foreArmAngle(110),
-        foreArmPos(0.0f, 0.0f, 1.5f),
-        foreArmScale(0.8f, 0.8f, 3.75f),
-        endOfForeArm(0.0f, 0.0f, 2.24f),
-        rightEdgeOfWrist(0.5f, 0.0f, 0.0f),
-        upperFingerAngle(-30),
-        upperFingerScale(1.5f, 0.5f, 0.5f),
-        upperRightFingerPos(0.60f, 0.0f, 0.0f),
-        endOfUpperRightFinger(0.8f, 0.0f, 0.0f),
-        lowerRightFingerAngle(-100),
-        lowerFingerScale(1.5f, 0.4f, 0.4f),
-        lowerRightFingerPos(0.6f, 0.0f, 0.0f),
-        leftEdgeOfWrist(-0.5, 0.0f, 0.0f),
-        upperLeftFingerPos(-0.6f, 0.0f, 0.0f),
-        endOfUpperLeftFinger(-0.8f, 0.0f, 0.0f),
-        lowerLeftFingerAngle(-80),
-        lowerLeftFingerPos(0.6,0.0f,0.0f)
-    {
-    }
-
-    void Draw(glm::mat4 cameraToClipMatrix, glm::mat4 worldToCameraMatrix)
-    {
-        MatrixStack matrixStack;
-
-        matrixStack.translate(basePos);
-        matrixStack.rotateY(baseAngleY);
-
-        matrixStack.PushTop();
-
-        matrixStack.scale(baseScale);
-
-        matrixStack.PushTop();
-        matrixStack.translate(baseLeftPos);
-        DrawCube(matrixStack, cameraToClipMatrix,worldToCameraMatrix);
-        matrixStack.Pop();
-
-        matrixStack.PushTop();
-        matrixStack.translate(baseRightPos);
-        DrawCube(matrixStack, cameraToClipMatrix, worldToCameraMatrix);
-
-        matrixStack.Pop();
-
-        matrixStack.Pop();
-
-        matrixStack.rotateX(upperArmAngle);
-        matrixStack.translate(upperArmPos);
-
-        matrixStack.PushTop();
-        matrixStack.scale(upperArmScale);
-        DrawCube(matrixStack, cameraToClipMatrix, worldToCameraMatrix);
-
-        matrixStack.Pop();
-
-        matrixStack.translate(endOfUpperArm);
-        matrixStack.rotateX(foreArmAngle);
-        matrixStack.translate(foreArmPos);
-
-        matrixStack.PushTop();
-        matrixStack.scale(foreArmScale);
-        DrawCube(matrixStack, cameraToClipMatrix, worldToCameraMatrix);
-
-        matrixStack.Pop();
-
-        matrixStack.translate(endOfForeArm);
-        DrawCube(matrixStack, cameraToClipMatrix, worldToCameraMatrix);
-
-
-        matrixStack.PushTop();
-        matrixStack.translate(rightEdgeOfWrist);
-        matrixStack.rotateZ(upperFingerAngle);
-        matrixStack.translate(upperRightFingerPos);
-
-        matrixStack.PushTop();
-        matrixStack.scale(upperFingerScale);
-        DrawCube(matrixStack, cameraToClipMatrix, worldToCameraMatrix);
-
-        matrixStack.Pop();
-
-        matrixStack.translate(endOfUpperRightFinger);
-        matrixStack.rotateZ(lowerRightFingerAngle);
-        matrixStack.translate(lowerRightFingerPos);
-        matrixStack.PushTop();
-        matrixStack.scale(lowerFingerScale);
-        DrawCube(matrixStack, cameraToClipMatrix, worldToCameraMatrix);
-
-        matrixStack.Pop();
-        matrixStack.Pop();
-
-        matrixStack.PushTop();
-        matrixStack.translate(leftEdgeOfWrist);
-        matrixStack.rotateZ(360 - upperFingerAngle);
-        matrixStack.translate(upperLeftFingerPos);
-        matrixStack.PushTop();
-        matrixStack.scale(upperFingerScale);
-        DrawCube(matrixStack, cameraToClipMatrix, worldToCameraMatrix);
-
-        matrixStack.Pop();
-
-        matrixStack.PushTop();
-        matrixStack.translate(endOfUpperLeftFinger);
-        matrixStack.rotateZ(lowerLeftFingerAngle);
-        matrixStack.translate(lowerLeftFingerPos);
-
-        matrixStack.PushTop();
-        matrixStack.scale(lowerFingerScale);
-        DrawCube(matrixStack, cameraToClipMatrix, worldToCameraMatrix);
-
-        matrixStack.Pop();
-        matrixStack.Pop();
-    }
-    void IncrementBaseAngle()
-    {
-        baseAngleY += 5.0;
-        if (baseAngleY > 360.0f)
-            baseAngleY -= 360.0f;
-        //Clamp(baseAngleY, 0.0f, 90.0f);
-    }
-    void DecrementBaseAngle()
-    {
-        baseAngleY -= 5.0;
-        if (baseAngleY < -360.0f)
-            baseAngleY += 360.0f;
-        //Clamp(baseAngleY, 0.0f, 90.0f);
-    }
-    void IncrementUpperArmAngle()
-    {
-        upperArmAngle += 5.0f;
-        Clamp(upperArmAngle, -80, -45);
-    }
-    void DecrementUpperArmAngle()
-    {
-        upperArmAngle -= 5.0f;
-        Clamp(upperArmAngle, -80, -45);
-    }
-    void IncrementForeArmAngle()
-    {
-        foreArmAngle += 5.0f;
-        Clamp(foreArmAngle, 50, 130);
-    }
-    void DecrementForeArmAngle()
-    {
-        foreArmAngle -= 5.0f;
-        Clamp(foreArmAngle, 50, 130);
-    }
-    void IncrementFingerAngle()
-    {
-        upperFingerAngle += 5.0f;
-        Clamp(upperFingerAngle, -60, 30);
-    }
-    void DecrementFingerAngle()
-    {
-        upperFingerAngle -= 5.0f;
-        Clamp(upperFingerAngle, -60, 30);
-    }
-    void DrawCube(MatrixStack& modelToWorldStack, glm::mat4 cameraToClipMatrix, glm::mat4 worldToCameraMatrix)
-    {
-        glm::mat4 gpuMatrix(1.0f);
-        gpuMatrix =  cameraToClipMatrix * worldToCameraMatrix * modelToWorldStack.Top() * gpuMatrix;
-
-        glUseProgram(programHandle);
-        glBindVertexArray(cubeArray);
-        glUniformMatrix4fv(transformationMatUniform, 1, GL_FALSE, glm::value_ptr(gpuMatrix));
-        glDrawElements(GL_TRIANGLES, sizeof(cubeIndex) / sizeof(cubeIndex[0]), GL_UNSIGNED_SHORT, 0);
-        glUseProgram(0);
-        glBindVertexArray(0);
-    }
-private:
-    inline void Clamp(float& value, float minimumValue, float maximumValue)
-    {
-        if (value > maximumValue)
-            value = maximumValue;
-        if (value < minimumValue)
-            value = minimumValue;
-    }
-
-    glm::vec3 basePos, baseLeftPos, baseRightPos;
-    glm::vec3 baseScale;
-    float baseAngleY;
-
-    glm::vec3 upperArmPos, upperArmScale, endOfUpperArm;
-    float upperArmAngle;
-
-    glm::vec3 foreArmPos, foreArmScale, endOfForeArm;
-    float foreArmAngle;
-
-    glm::vec3 rightEdgeOfWrist, leftEdgeOfWrist;
-
-    glm::vec3 upperRightFingerPos, upperLeftFingerPos, upperFingerScale, endOfUpperRightFinger, endOfUpperLeftFinger;
-    float upperFingerAngle;
-
-    glm::vec3 lowerRightFingerPos, lowerLeftFingerPos, lowerFingerScale;
-    float lowerRightFingerAngle, lowerLeftFingerAngle;
-};
-
-Armature armature;
-
 inline std::chrono::duration<float> timeDifference(std::chrono::steady_clock::time_point lhs, std::chrono::steady_clock::time_point rhs)
 {
     return lhs - rhs;
 }
 
-//pulled from gltut
-float CalcFrustumScale(float fFovDeg)
+void DrawTextureSquare(glm::mat4 inCameraToClip, glm::mat4 worldToCamera)
 {
-    const float degToRad = 3.14159f * 2.0f / 360.0f;
-    float fFovRad = fFovDeg * degToRad;
-    return 1.0f / tan(fFovRad / 2.0f);
+    glUseProgram(squareShader);
+
+    GLuint transformationMatrixSquare = glGetUniformLocation(squareShader, "inTransformationMat");
+
+    glm::mat4 modelToWorld(1.0f);
+
+    modelToWorld[3].z = -2;
+
+    glm::mat4 gpuMatrix(1.0f);
+    gpuMatrix = inCameraToClip * worldToCamera * modelToWorld * gpuMatrix;
+
+    glUniformMatrix4fv(transformationMatrixSquare, 1, GL_FALSE, glm::value_ptr(gpuMatrix));
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, texture);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, texture2);
+
+    glBindVertexArray(squareArray);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, 0);
+
+    glBindVertexArray(0);
+    glUseProgram(0);
 }
-//pulled from gltut
-float ComputeAngleRad(float fElapsedTime, float fLoopDuration)
-{
-    const float fScale = 3.14159f * 2.0f / fLoopDuration;
-    float fCurrTimeThroughLoop = fmodf(fElapsedTime, fLoopDuration);
-    return fCurrTimeThroughLoop * fScale;
-}
-
-float frustumScaleF = CalcFrustumScale(45.0f);
-
-glm::vec3 StationaryOffset(float elapsedTimeF) 
-{
-    return glm::vec3(0.0f, 0.0f, -20.0f);
-}
-
-glm::vec3 RotationXYOffset(float elapsedTimeF)
-{
-    const float loopDuration = 3.0f;
-    const float scale = (2 * 3.14159f)/loopDuration;
-
-    float currTimeThroughLoop = fmodf(elapsedTimeF, loopDuration);
-
-    return glm::vec3(cosf(currTimeThroughLoop * scale) * 5, sinf(currTimeThroughLoop * scale) * 5, -20);
-
-}
-
-glm::vec3 RotationXZOffset(float elapsedTimeF)
-{
-    const float loopDuration = 3.0f;
-    const float scale = (2 * 3.14159f) / loopDuration;
-
-    float currTimeThroughLoop = fmodf(elapsedTimeF, loopDuration);
-
-    return glm::vec3(cosf(currTimeThroughLoop * scale) * 5, 0, sinf(currTimeThroughLoop * scale) * -40);
-
-}
-
-glm::vec3 NullScale(float elapsedTimeF)
-{
-    return glm::vec3(1.0f, 1.0f, 1.0f);
-}
-
-glm::vec3 StaticUniformScale(float elapsedTimeF)
-{
-    return glm::vec3(3.0f, 3.0f, 3.0f);
-}
-
-glm::vec3 StaticNonUniformScale(float elapsedTimeF)
-{
-    return glm::vec3(1.0f, 5.0f, 2.0f);
-}
-
-glm::vec3 DynamicNonUniformScale(float elapsedTimeF)
-{
-    const float loopDuration = 3.0f;
-    const float scale = (2 * 3.14159f) / loopDuration;
-
-    float currTimeThroughLoop = fmodf(elapsedTimeF, loopDuration);
-    glm::vec3 retVec;
-    retVec.x = cosf(currTimeThroughLoop * scale) * 5;
-    retVec.y = sinf(currTimeThroughLoop * scale) * 5;
-    retVec.z = sinf(currTimeThroughLoop * scale) * cosf(currTimeThroughLoop * scale) * 5;
-
-    return retVec;
-}
-
-glm::vec3 DynamicUniformScale(float elapsedTimeF)
-{
-    const float loopDuration = 3.0f;
-    const float scale = (2 * 3.14159f) / loopDuration;
-
-    float currTimeThroughLoop = fmodf(elapsedTimeF, loopDuration);
-
-    glm::vec3 retVec;
-    retVec.x = 1 + cosf(currTimeThroughLoop * scale) * 5;
-    retVec.y = 1 + cosf(currTimeThroughLoop * scale) * 5;
-    retVec.z = 1 + cosf(currTimeThroughLoop * scale) * 5;
-
-    return retVec;
-}
-
-glm::mat3 NullRotate(float elapsedtimeF)
-{
-    return glm::mat3(1.0f);
-}
-
-//pulled from gltut. quaternion math is a lot to write out ;-;
-glm::mat3 RotateAxis(float fElapsedTime)
-{
-    float fAngRad = ComputeAngleRad(fElapsedTime, 2.0);
-    float fCos = cosf(fAngRad);
-    float fInvCos = 1.0f - fCos;
-    float fSin = sinf(fAngRad);
-    float fInvSin = 1.0f - fSin;
-
-    glm::vec3 axis(1.0f, 1.0f, 1.0f);
-    axis = glm::normalize(axis);
-
-    glm::mat3 theMat(1.0f);
-    theMat[0].x = (axis.x * axis.x) + ((1 - axis.x * axis.x) * fCos);
-    theMat[1].x = axis.x * axis.y * (fInvCos)-(axis.z * fSin);
-    theMat[2].x = axis.x * axis.z * (fInvCos)+(axis.y * fSin);
-
-    theMat[0].y = axis.x * axis.y * (fInvCos)+(axis.z * fSin);
-    theMat[1].y = (axis.y * axis.y) + ((1 - axis.y * axis.y) * fCos);
-    theMat[2].y = axis.y * axis.z * (fInvCos)-(axis.x * fSin);
-
-    theMat[0].z = axis.x * axis.z * (fInvCos)-(axis.y * fSin);
-    theMat[1].z = axis.y * axis.z * (fInvCos)+(axis.x * fSin);
-    theMat[2].z = (axis.z * axis.z) + ((1 - axis.z * axis.z) * fCos);
-    return theMat;
-}
-
-struct Instance
-{
-    typedef glm::mat3(*rotationFunc)(float);
-
-    rotationFunc CalcRotation;
-
-    glm::vec3 offset;
-
-    glm::mat4 ConstructMatrix(float elapsedTimeF)
-    {
-        
-        glm::mat4 returnMatrix(CalcRotation(elapsedTimeF));
-        returnMatrix[3] = glm::vec4(offset,1.0f);
-        return returnMatrix;
-    }
-};
-
-const Instance g_InstanceList[] = {
-    {RotateX, glm::vec3(3.0f,-3.0f,-20.0f)},
-    {RotateY, glm::vec3(-3.0f,-3.0f, -20.0f)},
-    {RotateZ, glm::vec3(-3.0,3.0f,-20.0f)},
-    {RotateAxis, glm::vec3(3.0f,3.0f,-20.0f)},
-    {NullRotate, glm::vec3(0.0f,0.0f,-20.0f)}
-};
 
 //copy pasted debug callback from khronos.org
 void GLAPIENTRY
@@ -614,119 +216,11 @@ MessageCallback(GLenum source,
         type, severity, message);
 }
 
-namespace ShaderManager
-{
-    //TODO: Binary cache of program once it's linked in order to speed up GPU reupload speed
-    //https://www.khronos.org/opengl/wiki/Shader_Compilation#Binary_upload
-
-    void testShaderCompilation(GLuint shaderHandle)
-    {
-        GLint compileStatus = 0;
-        glGetShaderiv(shaderHandle, GL_COMPILE_STATUS, &compileStatus);
-        if (compileStatus == GL_FALSE)
-        {
-            GLint logSize = 0;
-            glGetShaderiv(shaderHandle, GL_INFO_LOG_LENGTH, &logSize);
-            GLchar* exceptionMessage = (char*)_malloca(logSize * sizeof(char));
-            glGetShaderInfoLog(shaderHandle, logSize, NULL, exceptionMessage);
-
-            glDeleteShader(shaderHandle);
-            throw std::runtime_error::runtime_error("OpenGL Shader Compilation Failed : " + std::string(exceptionMessage));
-        }
-    }
-
-    void testProgramLinkage(GLuint programHandle)
-    {
-        GLint linkStatus = 0;
-        glGetProgramiv(programHandle, GL_LINK_STATUS, &linkStatus);
-
-        if (linkStatus == GL_FALSE)
-        {
-            GLint logSize = 0;
-            glGetProgramiv(programHandle, GL_INFO_LOG_LENGTH, &logSize);
-            GLchar* exceptionMessage = (char*)_malloca(logSize * sizeof(char));
-            glGetProgramInfoLog(programHandle, logSize, NULL, exceptionMessage);
-
-            glDeleteProgram(programHandle);
-
-            throw std::runtime_error::runtime_error("OpenGL Program Linkage Failed : " + std::string(exceptionMessage));
-        }
-    }
-
-    GLuint compileShader(GLenum shaderType, const std::string& filepath)
-    {
-        GLuint shaderHandle;
-        std::stringstream shaderText;
-        std::ifstream shaderFile;
-
-        shaderFile.open(filepath);
-
-        if (shaderFile.is_open())
-        {
-            shaderHandle = glCreateShader(shaderType);
-            std::string lineText;
-            while (std::getline(shaderFile, lineText))
-            {
-                shaderText << lineText << "\n";
-            }
-        }
-        else
-        {
-            std::cout << "The shader text could not be opened." << std::endl;
-            throw std::runtime_error::runtime_error("The shader text could not be opened.");
-        }
-        std::string tempString = shaderText.str();
-        const char* shaderSource = tempString.c_str();
-        glShaderSource(shaderHandle, 1, &shaderSource, NULL);
-        glCompileShader(shaderHandle);
-        try
-        {
-            testShaderCompilation(shaderHandle);
-        }
-        catch (std::runtime_error e)
-        {
-            std::cout << "Shader compilation failed." << std::endl;
-            throw std::runtime_error::runtime_error(e.what());
-        }
-        shaderFile.close();
-        return shaderHandle;
-    }
-
-    GLuint linkProgram(std::vector<GLuint> shaderHandles)
-    {
-        GLuint programHandle = glCreateProgram();
-
-        for (const auto& shaderHandle : shaderHandles)
-        {
-            glAttachShader(programHandle, shaderHandle);
-        }
-
-        glLinkProgram(programHandle);
-
-        for (const auto& shaderHandle : shaderHandles)
-        {
-            glDetachShader(programHandle, shaderHandle);
-            glDeleteShader(shaderHandle);
-        }
-
-        try
-        {
-            testProgramLinkage(programHandle);
-        }
-        catch (std::runtime_error e)
-        {
-            std::cout << "Program linkage failed." << std::endl;
-            throw std::runtime_error::runtime_error(e.what());
-        }
-        return programHandle;
-    }
-
-}
 
 void framebufferResizeCallback(GLFWwindow* window, int width, int height)
 {
-    cameraToClip[0][0] = frustumScaleF / (width / (float)height);
-    cameraToClip[1][1] = frustumScaleF;
+    currentCamera->cameraToClip[0][0] = currentCamera->frustumScale / (width / (float)height);
+    currentCamera->cameraToClip[1][1] = currentCamera->frustumScale;
 
     glViewport(0, 0, width, height);
 }
@@ -832,10 +326,10 @@ void mousePosCallback(GLFWwindow* window, double xpos, double ypos)
         lastY = (float)ypos;
         firstMouseEntry = false;
     }
-    if (camera.pitch > 89.0f)
-        camera.pitch = 89.0f;
-    if (camera.pitch < -89.0f)
-        camera.pitch = -89.0f;
+    if (currentCamera->pitch > 89.0f)
+        currentCamera->pitch = 89.0f;
+    if (currentCamera->pitch < -89.0f)
+        currentCamera->pitch = -89.0f;
 
     float xOffset = (float)xpos - lastX;
     float yOffset = (float)ypos - lastY;
@@ -846,8 +340,8 @@ void mousePosCallback(GLFWwindow* window, double xpos, double ypos)
     xOffset *= sensitivity;
     yOffset *= sensitivity;
 
-    camera.yaw += xOffset;
-    camera.pitch += yOffset;
+    currentCamera->yaw += xOffset;
+    currentCamera->pitch += yOffset;
 }
 
 void windowFocusCallback(GLFWwindow* window, int focused)
@@ -864,33 +358,33 @@ void windowFocusCallback(GLFWwindow* window, int focused)
 
 void handleKeyInputs()
 {
-    float movementNum = 100.0f * deltaTime;
+    float movementNum = 50.0f * deltaTime;
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
     {
-        camera.pos -= movementNum * camera.cameraZ;
+        currentCamera->pos -= movementNum * currentCamera->cameraZ;
     }
     if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
     {
-        camera.pos += movementNum * camera.cameraZ ;
+        currentCamera->pos += movementNum * currentCamera->cameraZ ;
     }
     if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
     {
-        camera.pos -= movementNum * camera.cameraX;
+        currentCamera->pos -= movementNum * currentCamera->cameraX;
 
     }
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
     {
-        camera.pos += movementNum * camera.cameraX;
+        currentCamera->pos += movementNum * currentCamera->cameraX;
 
     }
     if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS)
     {
-        camera.pos += movementNum * camera.cameraY;
+        currentCamera->pos += movementNum * currentCamera->cameraY;
 
     }
     if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS)
     {
-        camera.pos -= movementNum * camera.cameraY;
+        currentCamera->pos -= movementNum * currentCamera->cameraY;
 
     }
     if (glfwGetKey(window, GLFW_KEY_0) == GLFW_PRESS)
@@ -933,7 +427,24 @@ void initOpenGL()
     {
         throw std::runtime_error::runtime_error("glfw failed to initialize");
     }
-    window = glfwCreateWindow(640, 480, "Test Application", NULL, NULL);
+
+    int numOfMonitors;
+    GLFWmonitor** monitors = glfwGetMonitors(&numOfMonitors);
+    if (!monitors[1])
+    {
+        throw std::runtime_error::runtime_error("Failed to get Second Monitor");
+    }
+    const GLFWvidmode* mode = glfwGetVideoMode(monitors[1]);
+
+    glfwWindowHint(GLFW_RED_BITS, mode->redBits);
+    glfwWindowHint(GLFW_GREEN_BITS, mode->greenBits);
+    glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
+    glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
+
+    std::cout << mode->width << std::endl;
+    std::cout << mode->height << std::endl;
+
+    window = glfwCreateWindow(mode->width, mode->height, "Test Application", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -959,117 +470,151 @@ void initOpenGL()
 #endif
 }
 
-void initShaders()
-{
-    //Compile Shaders
-    std::vector<GLuint> shaderHandles;
-    try
-    {
-        shaderHandles.push_back(ShaderManager::compileShader(GL_VERTEX_SHADER, "D:\\Repos\\3D-Game-Engine\\3D-Game-Engine\\src\\shaders\\VertexShader.vert"));
-    }
-    catch (std::runtime_error e)
-    {
-        std::cout << e.what() << std::endl;
-        __debugbreak();
-        throw;
-    }
+//void initShaders()
+//{
+//    std::vector<GLenum> types{ GL_VERTEX_SHADER, GL_FRAGMENT_SHADER };
+//    std::vector<std::string> filepaths{ "D:\\Repos\\3D-Game-Engine\\3D-Game-Engine\\src\\shaders\\Square.vert","D:\\Repos\\3D-Game-Engine\\3D-Game-Engine\\src\\shaders\\Square.frag" };
+//    squareShader = Shader(types, filepaths).GetHandle();
+//}
 
-    try
-    {
-        shaderHandles.push_back(ShaderManager::compileShader(GL_FRAGMENT_SHADER, "D:\\Repos\\3D-Game-Engine\\3D-Game-Engine\\src\\shaders\\FragmentShader.frag"));
-    }
-    catch (std::runtime_error e)
-    {
-        std::cout << e.what() << std::endl;
-        __debugbreak();
-        throw;
-    }
-    //Link Shaders
-    try
-    {
-        programHandle = ShaderManager::linkProgram(shaderHandles);
-    }
-    catch (std::runtime_error e)
-    {
-        std::cout << e.what() << std::endl;
-        __debugbreak();
-        throw;
-    }
+void RegisterRenderables()
+{
+    //renderables.push_back(&armature);
+}
+
+void InitRenderables()
+{
+
 }
 
 //called once before main loop
 void init()
 {
     initOpenGL();
-    initShaders();
+    //initShaders();
 
-    glGenBuffers(1, &cubeBuffer);
-    glBindBuffer(GL_ARRAY_BUFFER, cubeBuffer);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
+    RegisterRenderables();
+    InitRenderables();
+
+    //RainbowCube rainbowCube;
+    Camera mainCamera;
+    armature.Init();
+    lightCube.Init();
+
+    //renderables.push_back(rainbowCube);
+    cameras.push_back(mainCamera);
+
+    currentCamera = &cameras[0];
+
+    stbi_set_flip_vertically_on_load(true);
+    data = stbi_load("D:\\Repos\\3D-Game-Engine\\3D-Game-Engine\\Assets\\Textures\\pattern.png", &texWidth, &texHeight, &numOfColorChannels, 0);
+
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+    if (data)
+    {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texWidth, texHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+    else
+    {
+        std::cout << "Failed to load texture data" << std::endl;
+    }
+
+    stbi_image_free(data);
+
+    data = stbi_load("D:\\Repos\\3D-Game-Engine\\3D-Game-Engine\\Assets\\Textures\\rose.jpg", &texWidth, &texHeight, &numOfColorChannels, 0);
+
+    glGenTextures(1, &texture2);
+    glBindTexture(GL_TEXTURE_2D, texture2);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+    if (data)
+    {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texWidth, texHeight, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+    else
+    {
+        std::cout << "Failed to load texture data" << std::endl;
+    }
+
+    stbi_image_free(data);
+
+    glUseProgram(squareShader);
+    glUniform1i(glGetUniformLocation(squareShader, "texture1"), 0);
+    glUniform1i(glGetUniformLocation(squareShader, "texture2"), 1);
+    glUseProgram(0);
+
+    glGenBuffers(1, &squareBuffer);
+    glBindBuffer(GL_ARRAY_BUFFER, squareBuffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(squareVertices), squareVertices, GL_STATIC_DRAW);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-    glGenBuffers(1, &cubeIbo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cubeIbo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cubeIndex), cubeIndex, GL_STATIC_DRAW);
+    glGenBuffers(1, &squareIbo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, squareIbo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(squareIndex), squareIndex, GL_STATIC_DRAW);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-    glGenVertexArrays(1, &cubeArray);
-    glBindVertexArray(cubeArray);
-    glBindBuffer(GL_ARRAY_BUFFER, cubeBuffer);
+    glGenVertexArrays(1, &squareArray);
+    glBindVertexArray(squareArray);
+
+    glBindBuffer(GL_ARRAY_BUFFER, squareBuffer);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 8, 0);
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, (const void*)(8 * 3 * sizeof(float)));
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, cubeIbo);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 8, (void*)(sizeof(float) * 3));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 8, (void*)(sizeof(float) * 6));
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, squareIbo);
 
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
+    //glGenBuffers(1, &vbo);
+    //glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    //glBufferData(GL_ARRAY_BUFFER, sizeof(intersectingPyramids), intersectingPyramids, GL_STATIC_DRAW);
+    //glBindBuffer(GL_ARRAY_BUFFER, 0);
 
-    glGenBuffers(1, &vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(intersectingPyramids), intersectingPyramids, GL_STATIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    //glGenBuffers(1, &ibo);
+    //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+    //glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indexData), indexData, GL_STATIC_DRAW);
+    //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
-    glGenBuffers(1, &ibo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indexData), indexData, GL_STATIC_DRAW);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    //glGenVertexArrays(1, &vao1);
+    //glBindVertexArray(vao1);
+    //glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    //glEnableVertexAttribArray(0);
+    //glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    //glEnableVertexAttribArray(1);
+    //size_t colorDataOffset = numberOfVertices * sizeof(float) * 3;
+    //glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, (void*)colorDataOffset);
+    //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+    //glBindVertexArray(0);
 
-    glGenVertexArrays(1, &vao1);
-    glBindVertexArray(vao1);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(1);
-    size_t colorDataOffset = numberOfVertices * sizeof(float) * 3;
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, (void*)colorDataOffset);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-    glBindVertexArray(0);
-
-    glGenVertexArrays(1, &vao2);
-    glBindVertexArray(vao2);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glEnableVertexAttribArray(0);
-    const size_t posDataOffset = sizeof(float) * 3 * (numberOfVertices / 2);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)posDataOffset);
-    glEnableVertexAttribArray(1);
-    colorDataOffset += sizeof(float) * 4 * (numberOfVertices / 2);
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, (void*)colorDataOffset);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-    glBindVertexArray(0);
-
-    const float camNearF = 1.0f;
-    const float camFarF = 10000.0f;
-
-    cameraToClip[0][0] = frustumScaleF;
-    cameraToClip[1][1] = frustumScaleF;
-    cameraToClip[2][2] = (camNearF + camFarF) / (camNearF - camFarF);
-    cameraToClip[3][2] = (camNearF * camFarF * 2) / (camNearF - camFarF);
-    cameraToClip[2][3] = -1;
-
-    transformationMatUniform = glGetUniformLocation(programHandle, "transformationMat"); 
+    //glGenVertexArrays(1, &vao2);
+    //glBindVertexArray(vao2);
+    //glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    //glEnableVertexAttribArray(0);
+    //const size_t posDataOffset = sizeof(float) * 3 * (numberOfVertices / 2);
+    //glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)posDataOffset);
+    //glEnableVertexAttribArray(1);
+    //colorDataOffset += sizeof(float) * 4 * (numberOfVertices / 2);
+    //glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, (void*)colorDataOffset);
+    //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+    //glBindVertexArray(0);
 
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
@@ -1084,36 +629,154 @@ void init()
 //called every loop
 void draw()
 {
-    glClearDepth(1.0f);
-    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
     currentFrameTime = (float)glfwGetTime();
     deltaTime = currentFrameTime - lastFrameTime;
     lastFrameTime = currentFrameTime;
 
     handleKeyInputs();
-    armature.Draw(cameraToClip, camera.DetermineWorldToCamera());
 
-    glfwSwapBuffers(window);
-    glfwPollEvents();
+    /*or (std::vector<Renderables>::const_iterator currentRenderable; currentRenderable != renderables.end(); std::advance(renderables, 1))
+    {
+        currentRenderable->Draw(*currentCamera);
+    }*/
+
+    armature.Draw(currentCamera);
+    lightCube.Draw(currentCamera);
+
+    DrawTextureSquare(currentCamera->cameraToClip, currentCamera->DetermineWorldToCamera());
+
 }
 
+
+const float cubeVertices[] =
+{
+        -0.5f, 0.5f, 0.5f,
+        0.5f, 0.5f, 0.5f,
+        -0.5f, -0.5f, 0.5f,
+        0.5f, -0.5f, 0.5f,
+
+        -0.5f, 0.5f, -0.5f,
+        0.5f, 0.5f, -0.5f,
+        -0.5f, -0.5f, -0.5f,
+        0.5f, -0.5f, -0.5f,
+};
+
+const GLushort cubeIndex[] =
+{
+    //front
+    0, 1, 3,
+    0, 3, 2,
+    //right
+    1, 5, 7,
+    1, 7, 3,
+    //back
+    5, 4, 6,
+    5, 6, 7,
+    //left
+    4, 0, 2,
+    4, 2, 6,
+    //top
+    4, 5, 1,
+    4, 1, 0,
+    //bottom
+    2, 3, 7,
+    2, 7, 6
+};
+
+GLuint vao1, vao2, vbo, ibo;
+Camera camera;
+
+Shader shadertester;
+
+void initLightingTut()
+{
+    initOpenGL();
+
+    Camera mainCamera;
+    cameras.push_back(mainCamera);
+    currentCamera = &cameras[0];
+
+    const std::vector<GLenum>& types{ GL_VERTEX_SHADER, GL_FRAGMENT_SHADER };
+    const std::vector<std::string>& filepaths{ "D:\\Repos\\3D-Game-Engine\\3D-Game-Engine\\src\\shaders\\lighting.vert", "D:\\Repos\\3D-Game-Engine\\3D-Game-Engine\\src\\shaders\\lighting.frag" };
+    shadertester.~Shader();
+    new(&shadertester) Shader(types, filepaths);
+
+    glGenBuffers(1, &vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVertices), cubeVertices, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    glGenBuffers(1, &ibo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cubeIndex), cubeIndex, GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+    glGenVertexArrays(1, &vao1);
+    glBindVertexArray(vao1);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+    glGenVertexArrays(1, &vao2);
+    glBindVertexArray(vao2);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+}
+
+void drawLightingTut()
+{
+    glUseProgram(shadertester.GetHandle());
+
+    glm::mat4 modelToWorld(1.0f);
+    modelToWorld[3].z = -10.0f;
+
+    glm::mat4 gpuMatrix(1.0f);
+    gpuMatrix = camera.cameraToClip * camera.DetermineWorldToCamera() * modelToWorld * gpuMatrix;
+
+    shadertester.SetMat4("transformationMatrix", gpuMatrix); 
+
+    glBindVertexArray(vao1);
+    glDrawElements(GL_TRIANGLES, sizeof(cubeIndex) / sizeof(cubeIndex[0]), GL_UNSIGNED_SHORT, 0);
+    glBindVertexArray(vao2);
+    glDrawElements(GL_TRIANGLES, sizeof(cubeIndex) / sizeof(cubeIndex[0]), GL_UNSIGNED_SHORT, 0);
+    glUseProgram(0);
+}
 int main(void)
 {
     try
     {
-        init();
+        //init();
+        initLightingTut();
     }
     catch(std::runtime_error e)
     {
         std::cout << e.what() << std::endl;
+        std::cin.get();
         return -1;
     }
 
     while (!glfwWindowShouldClose(window))
     {
-        draw();
+        glClearDepth(1.0f);
+        glClearColor(0.2f, 0.2f, 0.2f, 0.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        //draw();
+        drawLightingTut();
+
+        glfwSwapBuffers(window);
+        glfwPollEvents();
     }
     glfwTerminate();
     return 0;
